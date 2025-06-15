@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GeoJSON Map with Styling and Layer Toggle</title>
+  <title>Styled GeoJSON Map with Layer Control</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -23,7 +23,7 @@
   // Initialize map
   const map = L.map('map').setView([0, 0], 2);
 
-  // Base layer
+  // Add OpenStreetMap tiles
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
@@ -34,7 +34,7 @@
   // Style & file definitions
   const layers = [
     {
-      file: 'Parks.geojson',
+      file: 'https://raw.githubusercontent.com/spwork2930/Map/main/Parks.geojson',
       name: 'Layer 1 (Red)',
       style: {
         color: "#e41a1c",
@@ -45,7 +45,7 @@
       }
     },
     {
-      file: 'Plots.geojson',
+      file: 'https://raw.githubusercontent.com/spwork2930/Map/main/Plots.geojson',
       name: 'Layer 2 (Blue)',
       style: {
         color: "#377eb8",
@@ -56,7 +56,7 @@
       }
     },
     {
-      file: 'Roads.geojson',
+      file: 'https://raw.githubusercontent.com/spwork2930/Map/main/Roads.geojson',
       name: 'Layer 3 (Green)',
       style: {
         color: "#4daf4a",
