@@ -1,19 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My GeoJSON Map</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GeoJSON Map with Styling and Layer Toggle</title>
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    body { margin: 0; padding: 0; }
-    #map { height: 100vh; width: 100vw; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100vh; }
   </style>
 </head>
 <body>
@@ -22,23 +21,98 @@
 
 <script>
   // Initialize map
-  var map = L.map('map').setView([0, 0], 2);
+  const map = L.map('map').setView([0, 0], 2);
 
-  // Add OpenStreetMap base layer
+  // Base layer
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
+    attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
 
-  // Load your GeoJSON files
-  const files = ['Parks.geojson', 'Plots.geojson', 'Roads.geojson'];
+  // Layer control object
+  const overlayMaps = {};
 
-  files.forEach(file => {
-    fetch(file)
-      .then(res => res.json())
+  // Style & file definitions
+  const layers = [
+    {
+      file: 'Parks.geojson',
+      name: 'Layer 1 (Red)',
+      style: {
+        color: "#e41a1c",
+        weight: 2,
+        opacity: 0.9,
+        fillColor: "#e41a1c",
+        fillOpacity: 0.4
+      }
+    },
+    {
+      file: 'Plots.geojson',
+      name: 'Layer 2 (Blue)',
+      style: {
+        color: "#377eb8",
+        weight: 2,
+        opacity: 0.9,
+        fillColor: "#377eb8",
+        fillOpacity: 0.4
+      }
+    },
+    {
+      file: 'Roads.geojson',
+      name: 'Layer 3 (Green)',
+      style: {
+        color: "#4daf4a",
+        weight: 2,
+        opacity: 0.9,
+        fillColor: "#4daf4a",
+        fillOpacity: 0.4
+      }
+    }
+  ];
+
+  // Popup content formatter
+  function createPopupContent(properties) {
+    let content = "<b>Feature Info</b><br/>";
+    for (let key in properties) {
+      content += `<strong>${key}:</strong> ${properties[key]}<br/>`;
+    }
+    return content;
+  }
+
+  // Track bounds to fit after loading
+  let allBounds = [];
+
+  // Load each layer
+  layers.forEach(layer => {
+    fetch(layer.file)
+      .then(response => response.json())
       .then(data => {
-        L.geoJSON(data).addTo(map);
+        const geoLayer = L.geoJSON(data, {
+          style: layer.style,
+          onEachFeature: (feature, layerEl) => {
+            if (feature.properties) {
+              layerEl.bindPopup(createPopupContent(feature.properties));
+            }
+          }
+        });
+
+        // Add to map and to control
+        geoLayer.addTo(map);
+        overlayMaps[layer.name] = geoLayer;
+
+        // Extend bounds
+        if (geoLayer.getBounds().isValid()) {
+          allBounds.push(geoLayer.getBounds());
+        }
+
+        // Update control after loading
+        L.control.layers(null, overlayMaps, { collapsed: false }).addTo(map);
+
+        // Fit map to combined bounds after all loaded
+        if (allBounds.length === layers.length) {
+          const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0]);
+          map.fitBounds(combined);
+        }
       })
-      .catch(err => console.error('Error loading', file, err));
+      .catch(err => console.error(`Error loading ${layer.file}:`, err));
   });
 </script>
 
