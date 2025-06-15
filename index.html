@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Styled GeoJSON Map with Layer Control</title>
+  <title>GeoJSON Map with Single Toggle Control</title>
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
@@ -20,22 +18,17 @@
 <div id="map"></div>
 
 <script>
-  // Initialize map
   const map = L.map('map').setView([0, 0], 2);
 
-  // Add OpenStreetMap tiles
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
 
-  // Layer control object
-  const overlayMaps = {};
-
-  // Style & file definitions
+  // Define layer metadata
   const layers = [
     {
-      file: 'https://raw.githubusercontent.com/spwork2930/Map/main/Parks.geojson',
-      name: 'Layer 1 (Red)',
+      url: 'https://raw.githubusercontent.com/spwork2930/Map/main/Parks.geojson',
+      name: 'Park (Red)',
       style: {
         color: "#e41a1c",
         weight: 2,
@@ -45,8 +38,8 @@
       }
     },
     {
-      file: 'https://raw.githubusercontent.com/spwork2930/Map/main/Plots.geojson',
-      name: 'Layer 2 (Blue)',
+      url: 'https://raw.githubusercontent.com/spwork2930/Map/main/Plots.geojson',
+      name: 'Plot (Blue)',
       style: {
         color: "#377eb8",
         weight: 2,
@@ -56,8 +49,8 @@
       }
     },
     {
-      file: 'https://raw.githubusercontent.com/spwork2930/Map/main/Roads.geojson',
-      name: 'Layer 3 (Green)',
+      url: 'https://raw.githubusercontent.com/spwork2930/Map/main/Roads.geojson',
+      name: 'Road (Green)',
       style: {
         color: "#4daf4a",
         weight: 2,
@@ -68,52 +61,45 @@
     }
   ];
 
-  // Popup content formatter
-  function createPopupContent(properties) {
-    let content = "<b>Feature Info</b><br/>";
-    for (let key in properties) {
-      content += `<strong>${key}:</strong> ${properties[key]}<br/>`;
-    }
-    return content;
-  }
+  const overlayMaps = {};
+  const allBounds = [];
 
-  // Track bounds to fit after loading
-  let allBounds = [];
-
-  // Load each layer
-  layers.forEach(layer => {
-    fetch(layer.file)
-      .then(response => response.json())
+  // Load all layers, then add control once
+  Promise.all(layers.map(layerInfo =>
+    fetch(layerInfo.url)
+      .then(resp => resp.json())
       .then(data => {
         const geoLayer = L.geoJSON(data, {
-          style: layer.style,
+          style: layerInfo.style,
           onEachFeature: (feature, layerEl) => {
             if (feature.properties) {
-              layerEl.bindPopup(createPopupContent(feature.properties));
+              let content = "<b>Feature Info</b><br/>";
+              for (let key in feature.properties) {
+                content += `<strong>${key}:</strong> ${feature.properties[key]}<br/>`;
+              }
+              layerEl.bindPopup(content);
             }
           }
-        });
+        }).addTo(map);
 
-        // Add to map and to control
-        geoLayer.addTo(map);
-        overlayMaps[layer.name] = geoLayer;
+        overlayMaps[layerInfo.name] = geoLayer;
 
-        // Extend bounds
         if (geoLayer.getBounds().isValid()) {
           allBounds.push(geoLayer.getBounds());
         }
-
-        // Update control after loading
-        L.control.layers(null, overlayMaps, { collapsed: false }).addTo(map);
-
-        // Fit map to combined bounds after all loaded
-        if (allBounds.length === layers.length) {
-          const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0]);
-          map.fitBounds(combined);
-        }
       })
-      .catch(err => console.error(`Error loading ${layer.file}:`, err));
-  });
+  ))
+  .then(() => {
+    // Add one control with all overlays
+    L.control.layers(null, overlayMaps, { collapsed: false }).addTo(map);
+
+    // Zoom to all layers
+    if (allBounds.length > 0) {
+      const fullBounds = allBounds.reduce((acc, bounds) => acc.extend(bounds), allBounds[0]);
+      map.fitBounds(fullBounds);
+    }
+  })
+  .catch(error => console.error('Error loading layers:', error));
 </script>
 
 </body>
