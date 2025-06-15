@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GeoJSON Map with Single Toggle Control</title>
+  <title>Interactive GeoJSON Map with Toggle Layers</title>
 
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -18,13 +19,31 @@
 <div id="map"></div>
 
 <script>
-  const map = L.map('map').setView([0, 0], 2);
+  // Define base layers
+  const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  });
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri &mdash; Source: Esri, Maxar, Earthstar Geographics'
+  });
 
-  // Define layer metadata
+  // Initialize map
+  const map = L.map('map', {
+    center: [0, 0],
+    zoom: 2,
+    layers: [street] // Default base layer
+  });
+
+  const baseMaps = {
+    "Street View": street,
+    "Satellite View": satellite
+  };
+
+  const overlayMaps = {};
+  const allBounds = [];
+
+  // Define GeoJSON layer info
   const layers = [
     {
       url: 'https://raw.githubusercontent.com/spwork2930/Map/main/Parks.geojson',
@@ -61,45 +80,47 @@
     }
   ];
 
-  const overlayMaps = {};
-  const allBounds = [];
-
-  // Load all layers, then add control once
-  Promise.all(layers.map(layerInfo =>
-    fetch(layerInfo.url)
-      .then(resp => resp.json())
-      .then(data => {
-        const geoLayer = L.geoJSON(data, {
-          style: layerInfo.style,
-          onEachFeature: (feature, layerEl) => {
-            if (feature.properties) {
-              let content = "<b>Feature Info</b><br/>";
-              for (let key in feature.properties) {
-                content += `<strong>${key}:</strong> ${feature.properties[key]}<br/>`;
-              }
-              layerEl.bindPopup(content);
-            }
-          }
-        }).addTo(map);
-
-        overlayMaps[layerInfo.name] = geoLayer;
-
-        if (geoLayer.getBounds().isValid()) {
-          allBounds.push(geoLayer.getBounds());
-        }
-      })
-  ))
-  .then(() => {
-    // Add one control with all overlays
-    L.control.layers(null, overlayMaps, { collapsed: false }).addTo(map);
-
-    // Zoom to all layers
-    if (allBounds.length > 0) {
-      const fullBounds = allBounds.reduce((acc, bounds) => acc.extend(bounds), allBounds[0]);
-      map.fitBounds(fullBounds);
+  // Helper: popup content from feature properties
+  function createPopupContent(properties) {
+    let content = "<b>Feature Info</b><br/>";
+    for (let key in properties) {
+      content += `<strong>${key}:</strong> ${properties[key]}<br/>`;
     }
-  })
-  .catch(error => console.error('Error loading layers:', error));
+    return content;
+  }
+
+  // Load all GeoJSON layers and add to overlayMaps
+  Promise.all(
+    layers.map(layerInfo =>
+      fetch(layerInfo.url)
+        .then(res => res.json())
+        .then(data => {
+          const geoLayer = L.geoJSON(data, {
+            style: layerInfo.style,
+            onEachFeature: (feature, layer) => {
+              if (feature.properties) {
+                layer.bindPopup(createPopupContent(feature.properties));
+              }
+            }
+          }).addTo(map);
+
+          overlayMaps[layerInfo.name] = geoLayer;
+
+          if (geoLayer.getBounds().isValid()) {
+            allBounds.push(geoLayer.getBounds());
+          }
+        })
+    )
+  ).then(() => {
+    // Add single layer control (base + overlays)
+    L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+    // Fit map to all loaded GeoJSON features
+    if (allBounds.length > 0) {
+      const combined = allBounds.reduce((acc, bounds) => acc.extend(bounds), allBounds[0]);
+      map.fitBounds(combined);
+    }
+  }).catch(error => console.error("Error loading layers:", error));
 </script>
 
 </body>
